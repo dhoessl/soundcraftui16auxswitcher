@@ -1,6 +1,7 @@
 from RPi import GPIO
-from signal import signal, SIGINT, SIGTERM
 from time import sleep
+from socket import socket, AF_INET, SOCK_STREAM
+from signal import signal, SIGINT, SIGTERM
 from .mixer import Mixer
 
 
@@ -51,9 +52,34 @@ class Board:
         self.mixer = Mixer()
         signal(SIGTERM, self._clean)
         signal(SIGINT, self._clean)
+        self._selftest()
         self._start_mixer()
 
+    def _clean(self, sig, *args) -> None:
+        self.clean()
+
+    def _selftest(self) -> None:
+        for led in self.leds:
+            self.leds[led].on()
+            sleep(.5)
+        for led in self.leds:
+            self.leds[led].off()
+            sleep(.5)
+
+    def _network_connected(self) -> bool:
+        try:
+            with socket(AF_INET, SOCK_STREAM) as s:
+                s.connect(("10.10.10.1", "80"))
+            return True
+        except OSError:
+            return False
+
+    def _wait_for_network(self) -> None:
+        while not self._network_connected():
+            self._selftest()
+
     def _start_mixer(self) -> None:
+        self._wait_for_network()
         self.mixer.start()
         if self.mixer.connected:
             return None
@@ -63,9 +89,6 @@ class Board:
             sleep(.5)
             self.leds["blocker"].off()
             sleep(.5)
-
-    def _clean(self, sig, *args) -> None:
-        self.clean()
 
     def clean(self) -> None:
         self.mixer.stop()
