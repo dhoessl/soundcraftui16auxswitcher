@@ -89,9 +89,9 @@ class Board:
         while True:
             # indicate connection failed
             self.leds["blocker"].on()
-            sleep(.5)
+            sleep(.2)
             self.leds["blocker"].off()
-            sleep(.5)
+            sleep(.2)
 
     def clean(self) -> None:
         self.mixer.stop()
