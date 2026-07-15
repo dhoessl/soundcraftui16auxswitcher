@@ -12,7 +12,8 @@ setup(
     package_data={},
     include_package_data=True,
     install_requires=[
-        "soundcraftui16mqtt @ git+https://github.com/dhoessl/soundcraftui16mqtt.git"
+        "soundcraftui16mqtt @ git+https://github.com/dhoessl/soundcraftui16mqtt.git",
+        "RPi.GPIO"
     ],
     classifiers=[
         "Development Status :: 3 - Alpha",
