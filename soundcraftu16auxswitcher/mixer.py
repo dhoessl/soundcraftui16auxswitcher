@@ -5,7 +5,7 @@ from queue import Queue
 
 class Mixer(MixerBase):
     def __init__(self) -> None:
-        super().__init__("10.10.10.1", "80")
+        super().__init__("10.10.1.1", "80")
         self.queue = Queue()
         self.recv_thread = Thread(
             target=self._receiving,

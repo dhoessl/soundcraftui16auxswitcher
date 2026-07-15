@@ -69,7 +69,7 @@ class Board:
     def _network_connected(self) -> bool:
         try:
             with socket(AF_INET, SOCK_STREAM) as s:
-                s.connect(("10.10.10.1", "80"))
+                s.connect(("10.10.1.1", "80"))
             return True
         except OSError:
             return False
