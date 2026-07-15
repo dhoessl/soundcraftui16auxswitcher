@@ -1,11 +1,11 @@
-from soundcraftui16mqtt_mixer import MixerBase
+from soundcraftui16mqtt_mixer.main import MixerBase
 from threading import Thread
 from queue import Queue
 
 
 class Mixer(MixerBase):
     def __init__(self) -> None:
-        super().__init__("10.10.1.1", "80")
+        super().__init__("10.10.1.1", 80)
         self.queue = Queue()
         self.recv_thread = Thread(
             target=self._receiving,

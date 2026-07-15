@@ -24,7 +24,7 @@ class Led:
 
 
 class Switch:
-    def __init(self, num: int) -> None:
+    def __init__(self, num: int) -> None:
         self.num = num
         GPIO.setup(num, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 
@@ -61,16 +61,19 @@ class Board:
     def _selftest(self) -> None:
         for led in self.leds:
             self.leds[led].on()
-            sleep(.5)
+            sleep(.2)
         for led in self.leds:
             self.leds[led].off()
-            sleep(.5)
+            sleep(.2)
 
     def _network_connected(self) -> bool:
         try:
-            with socket(AF_INET, SOCK_STREAM) as s:
-                s.connect(("10.10.1.1", "80"))
+            sock = socket(AF_INET, SOCK_STREAM)
+            sock.settimeout(3)
+            sock.connect(("10.10.1.1", 80))
             return True
+        except TimeoutError:
+            return False
         except OSError:
             return False
 
