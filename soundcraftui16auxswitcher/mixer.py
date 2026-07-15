@@ -1,4 +1,4 @@
-from soundcraftui16_mixer import MixerBase
+from soundcraftui16mqtt_mixer import MixerBase
 from threading import Thread
 from queue import Queue
 
