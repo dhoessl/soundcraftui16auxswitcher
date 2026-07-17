@@ -3,7 +3,7 @@ from threading import Thread
 from queue import Queue
 
 
-class Mixer(MixerBase):
+class Listener(MixerBase):
     def __init__(self) -> None:
         super().__init__("10.10.1.1", 80)
         self.queue = Queue()
@@ -11,21 +11,6 @@ class Mixer(MixerBase):
             target=self._receiving,
             args=()
         )
-
-    def _read_messag(self, message: str) -> None:
-        msg_type, body, value = message.split('^')
-        parts = body.split('.')
-        if (
-            parts[0] != "i"
-            or parts[1] not in ["4", "6"]
-            or parts[2] != "a"
-            or parts[3] != "0"
-            or parts[4] != "mute"
-        ):
-            return None
-        # self.queue.put({"component": "delay", "state": value})
-        # self.queue.put({"component": "siren", "state": value})
-        print(f"{msg_type} -> {parts} -> {value}")
 
     def _receiving(self) -> None:
         buffer = ""
@@ -39,7 +24,6 @@ class Mixer(MixerBase):
                 self.exit.set()
                 continue
             if "\n" not in buffer:
-                # If no message delimiter is found wait for new messages
                 continue
             # split buffer on delimiter into parts
             parts = buffer.split("\n")
@@ -49,8 +33,31 @@ class Mixer(MixerBase):
             buffer = parts[len(parts)-1]
             for message in data:
                 if "SETD" in message:
-                    # Send message using mqtt
-                    self._read_message(message)
+                    _, body, value = message.split('^')
+                    msg_parts = body.split('.')
+                    if (
+                        msg_parts[0] != "i"
+                        or msg_parts[1] not in ["4", "6"]
+                        or msg_parts[2] != "aux"
+                        or msg_parts[3] != "0"
+                        or msg_parts[4] != "mute"
+                    ):
+                        continue
+                    self.queue.put({
+                        "component": "delay" if msg_parts["4"] else "siren",
+                        "state": value
+                    })
+
+    def start(self) -> None:
+        self.connect()
+
+    def stop(self) -> None:
+        self.terminate()
+
+
+class Sender(MixerBase):
+    def __init__(self) -> None:
+        super().__init__("10.10.1.1", 80)
 
     def _send_setd(self, body: str, value: str | float) -> bool:
         if not self.connected:
@@ -67,7 +74,7 @@ class Mixer(MixerBase):
         self.terminate()
 
     def toggle_delay(self, state: bool) -> None:
-        self._send_setd("i.4.a.0.mute", int(state))
+        self._send_setd("i.4.aux.0.mute", int(state))
 
     def toggle_siren(self, state: bool) -> None:
-        self._send_setd("i.6.a.0.mute", int(state))
+        self._send_setd("i.6.aux.0.mute", int(state))
