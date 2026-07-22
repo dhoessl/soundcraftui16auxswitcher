@@ -26,10 +26,44 @@ class Switch:
     def __init__(self, num: int) -> None:
         self.num = num
         GPIO.setup(num, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+        self.mixer_mute = None
 
     @property
     def state(self) -> bool:
         return GPIO.input(self.num) == GPIO.HIGH
+
+    def action_required(
+        self,
+        led_red: Led,
+        led_green: Led
+    ) -> tuple[bool | bool]:
+        if self.mixer_mute is None:
+            return (False, None)
+        elif (
+            self.state
+            and not led_red.state
+            and (
+                not led_green.state
+                or self.mixer_mute
+            )
+        ):
+            # unmute action required
+            led_red.on()
+            return (True, False)
+        elif (
+            not self.state
+            and not led_red.state
+            and (
+                led_green.state
+                or not self.mixer_mute
+            )
+        ):
+            # mute action required
+            led_red.on()
+            led_green.off()
+            return (True, True)
+        else:
+            return (False, None)
 
 
 class Board:
@@ -103,49 +137,27 @@ class Board:
 
     def check_switches(self) -> None:
         if self.switches["blocker"].state:
-            if not self.leds["blocker"].state:
+            if self.leds["blocker"].state:
+                # turn blocker led on if blocker switch is on
                 self.leds["blocker"].on()
+            # block any other action if blocker is on
             return None
         elif not self.switches["blocker"].state and self.leds["blocker"].state:
+            # turn blocker led off if bocker switch is off
             self.leds["blocker"].off()
-        if (
-            self.switches["delay"].state
-            and not self.leds["delay_red"].state
-            and not self.leds["delay_green"].state
-        ):
-            # unmute delay to echo
-            self.leds["delay_red"].on()
-            self.leds["delay_green"].required_state = True
-            self.sender.toggle_delay(False)
-        elif (
-            not self.switches["delay"].state
-            and not self.leds["delay_red"].state
-            and self.leds["delay_green"].state
-        ):
-            # mute delay to echo
-            self.leds["delay_red"].on()
-            self.leds["delay_green"].off()
-            self.leds["delay_green"].required_state = False
-            self.sender.toggle_delay(True)
-        if (
-            self.switches["siren"].state
-            and not self.leds["siren_red"].state
-            and not self.leds["siren_green"].state
-        ):
-            # unmute siren to echo
-            self.leds["siren_red"].on()
-            self.leds["siren_green"].required_state = True
-            self.sender.toggle_siren(False)
-        elif (
-            not self.switches["siren"].state
-            and not self.leds["siren_red"].state
-            and self.leds["siren_green"].state
-        ):
-            # mute siren to echo
-            self.leds["siren_red"].on()
-            self.leds["siren_green"].off()
-            self.leds["siren_green"].required_state = False
-            self.sender.toggle_siren(True)
+        for comp in ["delay", "siren"]:
+            action_required, action = self.switches[f"{comp}"].action_required(
+                self.leds[f"{comp}_red"], self.leds[f"{comp}_green"]
+            )
+            if not action_required:
+                # Skip action if not action is required
+                return None
+            if comp == "delay":
+                # delay mute (action == true) or unmute (action == False)
+                self.sender.toggle_delay(action)
+            else:
+                # siren mute (action == true) or unmute (action == False)
+                self.sender.toggle_siren(action)
 
     def check_queue(self) -> None:
         while self.listener.queue.qsize() > 0:
@@ -155,43 +167,32 @@ class Board:
                 continue
             if (
                 msg["state"] == "0"
-                and self.leds[f"{comp}_red"].state
-                and self.leds[f"{comp}_green"].required_state
+                and self.switches["blocker"].state
+                and self.switches[f"{comp}"].mixer_mute
             ):
+                self.leds[f"{comp}_red"].off()
+                self.leds[f"{comp}_green"].off()
+                self.switches[f"{comp}"].mixer_mute = False
+                continue
+            elif (
+                msg["state"] == "1"
+                and self.switches["blocker"].state
+                and not self.switches[f"{comp}"].mixer_mute
+            ):
+                self.leds[f"{comp}_red"].off()
+                self.leds[f"{comp}_green"].off()
+                self.switches[f"{comp}"].mixer_mute = True
+                continue
+            if msg["state"] == "0":
                 # show unmute of siren/delay to echo
+                self.switches[f"{comp}"].mixer_mute = False
                 self.leds[f"{comp}_green"].on()
                 self.leds[f"{comp}_red"].off()
-            elif (
-                msg["state"] == "1"
-                and self.leds[f"{comp}_red"].state
-                and not self.leds[f"{comp}_green"].required_state
-            ):
+            elif msg["state"] == "1":
                 # show mute of siren/delay to echo
+                self.switches[f"{comp}"].mixer_mute = True
                 self.leds[f"{comp}_red"].off()
-            elif (
-                msg["state"] == "0"
-                and not self.switches[f"{comp}"].state
-            ):
-                # mute if switch is on mute but message was unmute
-                self.leds[f"{comp}_red"].on()
                 self.leds[f"{comp}_green"].off()
-                self.leds[f"{comp}_green"].required_state = False
-                if comp == "delay":
-                    self.sender.toggle_delay(True)
-                else:
-                    self.sender.toggle_siren(True)
-            elif (
-                msg["state"] == "1"
-                and self.switches[f"{comp}"].state
-            ):
-                # unmute if switch is on unmute but message was mute
-                self.leds[f"{comp}_red"].on()
-                self.leds[f"{comp}_green"].off()
-                self.leds[f"{comp}_green"].required_state = True
-                if comp == "delay":
-                    self.sender.toggle_delay(False)
-                else:
-                    self.sender.toggle_siren(False)
 
     def start(self) -> None:
         while True:

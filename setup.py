@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="soundcraftui16auxswitcher",
-    version="0.0.3-rc0",
+    version="0.0.4-rc0",
     description=("POC"),
     url="https://github.com/dhoessl/soundcraftui16auxswitcher.git",
     author="Dominic Hößl",
