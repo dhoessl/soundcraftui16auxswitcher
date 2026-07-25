@@ -82,7 +82,6 @@ class Board:
             "siren": Switch(3),
             "blocker": Switch(4)
         }
-        self.sender = Sender()
         self.listener = Listener()
         signal(SIGTERM, self._clean)
         signal(SIGINT, self._clean)
@@ -118,8 +117,7 @@ class Board:
     def _start_mixer(self) -> None:
         self._wait_for_network()
         self.listener.start()
-        self.sender.start()
-        if self.listener.connected and self.sender.connected:
+        if self.listener.connected:
             return None
         while True:
             # indicate connection failed
@@ -130,7 +128,6 @@ class Board:
 
     def clean(self) -> None:
         self.listener.stop()
-        self.sender.stop()
         for led in self.leds:
             self.leds[led].off()
         GPIO.cleanup()
@@ -149,15 +146,8 @@ class Board:
             action_required, action = self.switches[f"{comp}"].action_required(
                 self.leds[f"{comp}_red"], self.leds[f"{comp}_green"]
             )
-            if not action_required:
-                # Skip action if not action is required
-                return None
-            if comp == "delay":
-                # delay mute (action == true) or unmute (action == False)
-                self.sender.toggle_delay(action)
-            else:
-                # siren mute (action == true) or unmute (action == False)
-                self.sender.toggle_siren(action)
+            if action_required:
+                Sender(comp, action)
 
     def check_queue(self) -> None:
         while self.listener.queue.qsize() > 0:

@@ -56,8 +56,14 @@ class Listener(MixerBase):
 
 
 class Sender(MixerBase):
-    def __init__(self) -> None:
+    def __init__(self, action: str, state: bool) -> None:
         super().__init__("10.10.1.1", 80)
+        self.start()
+        if action == "delay":
+            self.toggle_delay(state)
+        else:
+            self.toggle_siren(state)
+        self.stop()
 
     def _send_setd(self, body: str, value: str | float) -> bool:
         if not self.connected:
